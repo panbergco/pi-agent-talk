@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+// macp — the human (or a script) at the MACP hub, without a Pi session.
+//   macp roster <project>            agents in a project (with offline ones)
+//   macp send <address> <text> [--steer|--interrupt|--info]   send as the operator (human://$USER)
+//   macp trace <delivery id or prefix>  every stage of a message
+// MACP_URL (default http://127.0.0.1:7737/mcp), MACP_OPERATOR_TOKEN if the hub requires one.
+import { createRequire } from "node:module";
+import { userInfo } from "node:os";
+const require = createRequire(new URL("../center/package.json", import.meta.url));
+const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
+const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js");
+const [cmd, ...rest] = process.argv.slice(2);
+const flags = rest.filter((x) => x.startsWith("--")), args = rest.filter((x) => !x.startsWith("--"));
+const c = new Client({ name: "macp-cli", version: "0.1.0" });
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+let key = process.env.MACP_TOKEN; try { key ??= readFileSync(process.env.MACP_TOKEN_FILE ?? `${homedir()}/.config/macp-center/token`, "utf8").trim(); } catch {}
+await c.connect(new StreamableHTTPClientTransport(new URL(process.env.MACP_URL || (() => { try { return readFileSync(process.env.MACP_URL_FILE ?? `${homedir()}/.config/macp-center/url`, "utf8").trim(); } catch { return ""; } })() || "http://127.0.0.1:7737/mcp"), key ? { requestInit: { headers: { Authorization: `Bearer ${key}` } } } : undefined));
+const call = async (name, a) => { const r = await c.callTool({ name, arguments: a }); const j = JSON.parse(r.content[0].text); if (r.isError) { console.error(j.error ?? JSON.stringify(j)); process.exitCode = 1; } return j; };
+await call("macp_register", { agent_id: userInfo().username, harness: "operator", ...(process.env.MACP_OPERATOR_TOKEN ? { operator_token: process.env.MACP_OPERATOR_TOKEN } : {}) });
+if (cmd === "roster") {
+  const r = await call("macp_roster", { project: args[0]?.startsWith("prj:") || !args[0] ? args[0] : `prj:${args[0]}`, include_offline: true });
+  for (const a of r.agents ?? []) console.log(`${a.live ? "live   " : "offline"}  ${(a.role ?? "-").padEnd(14)} ${(a.state ?? "-").padEnd(5)} ${a.location ?? a.address}`);
+} else if (cmd === "send") {
+  const pr = flags.includes("--interrupt") ? "interrupt" : flags.includes("--info") ? "info" : flags.includes("--advisory") ? "advisory" : "steering";
+  const r = await call("macp_send", { to: args[0], body: args.slice(1).join(" "), priority: pr });
+  for (const d of r.deliveries ?? []) console.log(`accepted → ${d.to} (${d.priority})  trace: ${d.id.slice(2, 10)}`);
+  for (const x of r.refused ?? []) console.log(`refused → ${x.to}: ${x.reason}`);
+} else if (cmd === "trace") {
+  const id = args[0]?.startsWith("d_") ? args[0] : `d_${args[0]}`;
+  const s = await call("macp_status", { delivery_id: id });
+  if (s.stage) { console.log(`${s.stage.toUpperCase()} — ${s.detail}\n${s.from} → ${s.to} (${s.priority})`); for (const [k, v] of Object.entries(s.times)) if (v) console.log(`  ${k.padEnd(9)} ${v}`); }
+} else console.log("usage: macp roster <project> | macp send <address> <text> [--steer|--interrupt|--info|--advisory] | macp trace <id>");
+await c.close();

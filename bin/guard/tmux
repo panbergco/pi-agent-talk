@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# tmux guard (pi-agent-talk) — first on PATH for every command a Pi session runs.
+#
+# BLOCKS an agent typing WORDS into a Pi session on the real tmux server: that is agents talking to
+# each other behind pi-agent-talk's rules, and it reaches the other model as if the human typed it.
+# KEEPS everything troubleshooting needs: control keys, slash commands (except /talk), @file pastes,
+# any pane that is not running Pi, other tmux servers (tests), a trusted orchestrator's own door,
+# and anything at all in a turn the human started (PI_HUMAN_TURN=1, set by the extension).
+#
+# Trusted orchestrators (programs whose own rules decide, e.g. a supervisor that wakes its sessions):
+# ~/.config/macp-center/orchestrators, one real path or glob per line; MACP_GUARD_ORCHESTRATORS (":"-list) adds.
+# A guardrail against noise, not security: /usr/bin/tmux bypasses it. MACP_TMUX_GUARD=0 disables.
+# Log: ~/.local/state/pi-agent-talk/tmux-guard.log
+set -u
+self=$(dirname "$(readlink -f "$0")")
+REAL=$(PATH=$(printf %s "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd:) command -v tmux) || { echo "tmux guard: real tmux not found" >&2; exit 127; }
+
+# Fast path: only typing commands are looked at.
+case " $* " in *" send"*|*" paste"*) ;; *) exec "$REAL" "$@" ;; esac
+[ "${MACP_TMUX_GUARD:-1}" = "0" ] && exec "$REAL" "$@"
+
+log() { local d="${XDG_STATE_HOME:-$HOME/.local/state}/pi-agent-talk"; mkdir -p "$d"; printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$1" "${MACP_SELF:-?}" "$2" "${3:0:120}" >> "$d/tmux-guard.log"; }
+
+# ── global options (before the command) ─────────────────────────────────────
+sock=() ; sockpath=""
+args=("$@"); i=0
+while [ $i -lt ${#args[@]} ]; do
+  a=${args[$i]}
+  case "$a" in
+    -L) sock+=(-L "${args[$((i+1))]}"); sockpath="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/${args[$((i+1))]}"; i=$((i+2));;
+    -S) sock+=(-S "${args[$((i+1))]}"); sockpath=$(readlink -f "${args[$((i+1))]}"); i=$((i+2));;
+    -f|-c|-T) i=$((i+2));;
+    -*) i=$((i+1));;
+    *) break;;
+  esac
+done
+default="${MACP_GUARD_SOCKET:-${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/default}"
+if [ -z "$sockpath" ]; then sockpath=${TMUX:+${TMUX%%,*}}; sockpath=${sockpath:-$default}; fi
+[ "$(readlink -f "$sockpath")" = "$(readlink -f "$default")" ] || exec "$REAL" "$@"   # another server: tests, thin clients
+
+# ── who is calling: the orchestrator's own door decides for itself ─────────
+orch=()
+f="${MACP_GUARD_ORCHESTRATORS_FILE:-$HOME/.config/macp-center/orchestrators}"
+[ -r "$f" ] && while IFS= read -r l; do [[ -n "$l" && "$l" != \#* ]] && orch+=("$l"); done < "$f"
+IFS=: read -r -a extra <<< "${MACP_GUARD_ORCHESTRATORS:-}"; for l in "${extra[@]}"; do [ -n "$l" ] && orch+=("$l"); done
+is_orch() { local x=$1 o; [ -z "$x" ] && return 1; for o in "${orch[@]}"; do [[ "$x" == $o ]] && return 0; done; return 1; }
+p=$PPID
+for _ in 1 2 3 4 5 6; do
+  [ "$p" -le 1 ] 2>/dev/null && break
+  # WHICH PROGRAM, by real path — never the whole command line, and never a script an agent named alike.
+  mapfile -d '' -t av < /proc/$p/cmdline 2>/dev/null || av=()
+  r0=$(readlink -f "${av[0]:-/}" 2>/dev/null); r1=$(readlink -f "${av[1]:-/}" 2>/dev/null)
+  if [ ${#orch[@]} -gt 0 ] && { is_orch "$r0" || is_orch "$r1"; }; then
+    log allow-orchestrator "-" "$*"; exec "$REAL" "$@"
+  fi
+  p=$(awk '{print $4}' /proc/$p/stat 2>/dev/null || echo 1)
+done
+human=${PI_HUMAN_TURN:-0}
+
+is_key() { [[ "$1" =~ ^((C|M|S)-)*([A-Za-z0-9]|Enter|Escape|Tab|BTab|BSpace|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|PPage|NPage|DC|IC|F[0-9]{1,2}|KP[A-Za-z0-9]+)$ ]]; }
+allowed_text() { # literal text that is repair, not conversation
+  local t="$1"
+  [[ "$t" =~ ^/talk([[:space:]]|$) ]] && return 1           # /talk would speak with the human's authority
+  [[ "$t" =~ ^/[A-Za-z] ]] && return 0                      # slash commands: /reload, /compact, /rotate …
+  [[ "$t" =~ ^@[^[:space:]]+[[:space:]]?$ ]] && return 0    # an @file paste
+  return 1
+}
+
+# ── each command in a "a ; b" chain ────────────────────────────────────────
+check_segment() { # $@ = command and its args
+  local cmd=$1; shift
+  case "$cmd" in
+    send|send-k|send-ke|send-key|send-keys) ;;
+    pasteb|paste-b|paste-bu|paste-buf|paste-buff|paste-buffe|paste-buffer) ;;
+    *) return 0;;
+  esac
+  local target="" literal=0 hex=0 copy=0 keys=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -t) target=$2; shift 2;;
+      -b|-c|-N|-F|-s) shift 2;;
+      -l) literal=1; shift;;
+      -H) hex=1; shift;;
+      -X) copy=1; shift;;
+      -*) shift;;
+      *) keys+=("$1"); shift;;
+    esac
+  done
+  [ $copy = 1 ] && return 0
+  local pcmd; pcmd=$("$REAL" "${sock[@]}" display-message -p -t "${target:-${TMUX_PANE:-}}" '#{pane_current_command}' 2>/dev/null)
+  [ "$pcmd" = "pi" ] || return 0                                   # bash and every other pane: untouched
+  local words=""
+  if [[ "$cmd" == paste* ]]; then words="(paste-buffer)"
+  else
+    for k in "${keys[@]}"; do
+      if [ $literal = 0 ] && [ $hex = 0 ] && is_key "$k"; then continue; fi
+      allowed_text "$k" && continue
+      words+="$k "
+    done
+  fi
+  [ -z "$words" ] && { log allow-keys "$target" "${keys[*]:-}"; return 0; }
+  [ "$human" = "1" ] && { log allow-human-turn "$target" "$words"; return 0; }
+  log BLOCK "$target" "$words"
+  cat >&2 <<EOF
+tmux guard: typing words into another Pi session (pane ${target:-current}) is blocked — it lets agents
+talk behind the messaging rules, and the other model reads it as the human.
+  To message an agent: use your project's own channel (its refusal names it), or ask the human (/talk).
+  To fix a session: control keys (C-c, Escape, Enter …) and slash commands (/reload, /compact …) still work,
+  and anything is allowed in a turn the human started.
+EOF
+  return 1
+}
+
+seg=() ; rest=("${args[@]:$i}")
+for a in "${rest[@]}" ";"; do
+  if [ "$a" = ";" ] || [ "$a" = "\\;" ]; then
+    [ ${#seg[@]} -gt 0 ] && { check_segment "${seg[@]}" || exit 1; }
+    seg=()
+  else seg+=("$a"); fi
+done
+exec "$REAL" "$@"

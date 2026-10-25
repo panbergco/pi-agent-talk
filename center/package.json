@@ -1,0 +1,29 @@
+{
+  "name": "pi-agent-talk-center",
+  "version": "0.1.0",
+  "description": "MACP 2.0 center for pi-agent-talk (derived from the MACP reference center) with topology policy",
+  "main": "dist/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs && node test/policy.mjs && node test/receipts.mjs && node test/human.mjs && node test/identity.mjs",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "macp-center": "dist/index.js"
+  }
+}

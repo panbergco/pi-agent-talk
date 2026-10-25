@@ -1,0 +1,19 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: tmux (for the guard test)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
+      - name: install (builds the hub)
+        run: npm install --no-audit --no-fund
+      - name: hub tests
+        run: cd center && npm test
+      - name: tmux guard test
+        run: bin/guard/test.sh

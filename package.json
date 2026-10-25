@@ -1,0 +1,39 @@
+{
+  "name": "pi-agent-talk",
+  "version": "0.1.0",
+  "description": "Agent-to-agent messaging for Pi over MACP 2.0: messages enter as attributed custom messages at the next inference boundary \u2014 never through the prompt box, never in the human's input history.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "multi-agent",
+    "macp",
+    "mcp"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/panbergco/pi-agent-talk.git"
+  },
+  "homepage": "https://github.com/panbergco/pi-agent-talk",
+  "scripts": {
+    "prepare": "cd center && npm install --no-audit --no-fund && npx tsc",
+    "test": "cd center && npm test && cd .. && bin/guard/test.sh"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

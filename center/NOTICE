@@ -1,0 +1,3 @@
+Derived from the MACP 2.0 reference center
+(https://github.com/multiagentcognition/macp, commit 650046e, Apache-2.0).
+Changes: topology policy (src/policy.ts) and its enforcement in macp_send.

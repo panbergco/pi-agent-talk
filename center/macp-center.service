@@ -1,0 +1,15 @@
+[Unit]
+Description=MACP center for pi-agent-talk (localhost only)
+After=network.target
+
+[Service]
+# systemd's user PATH rarely holds node; point it at yours (mise shims shown).
+Environment=PATH=%h/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/bin/mkdir -p %h/.local/state/macp-center
+ExecStart=/usr/bin/env node %h/Code/pi-agent-talk/center/dist/index.js --port 7737 --db %h/.local/state/macp-center/center.db
+# Add rules: --policy %h/.config/macp-center/policy.json
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
