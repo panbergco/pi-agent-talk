@@ -95,8 +95,10 @@ const TASKS = {
   reply: async (i) => { const t = `TOKEN-${++n}`; const id = await send(`c${i}`, `Reply to this message with macp_send (in_reply_to its id) with exactly: ${t}`, "steering");
     expect.push({ kind: "reply", t, from: `c${i}`, to: "human://", id }); },
   relay: async (i) => { const j = (i + 1 + rnd(N - 1)) % N; const t = `RELAY-${++n}`;
-    const id = await send(`c${i}`, `Use macp_send to send the agent with role c${j} (to "c${j}", priority steering) exactly this: "${t}: reply to the human (to "human://dm") with ${t}-ACK"`, "steering");
-    expect.push({ kind: "relay", t, from: `c${i}`, to: `c${j}`, id }); expect.push({ kind: "relay-ack", t: `${t}-ACK`, from: `c${j}`, to: "human://", id }); },
+    // The second hop answers the SENDING agent. (Asking it to message the human on an agent's say-so measured model
+    // judgement, not delivery: in round 3 one agent rightly declined "agent-to-human relays on an agent's say-so".)
+    const id = await send(`c${i}`, `Use macp_send to send the agent with role c${j} (to "c${j}", priority steering) exactly this: "${t}: please reply to me with ${t}-ACK"`, "steering");
+    expect.push({ kind: "relay", t, from: `c${i}`, to: `c${j}`, id }); expect.push({ kind: "relay-ack", t: `${t}-ACK`, from: `c${j}`, to: `c${i}`, id }); },
   info: async (i) => { const t = `INFO-${++n}`; const id = await send(`c${i}`, `FYI ${t}. No reply needed.`, "info"); expect.push({ kind: "info", t, to: `c${i}`, id, placedOnly: true }); },
   busy: async (i) => { const t = `BUSY-${++n}`; const id = await send(`c${i}`, `Run this bash command: sleep 20 && echo done. Then reply to the human with macp_send: ${t}`, "steering");
     expect.push({ kind: "busy", t, from: `c${i}`, to: "human://", id });
