@@ -23,10 +23,13 @@ export function rankAgents(agents: any[], query: string): { query: string; token
       let best = 0;
       for (const h of hay) {
         if (h === tk) best = Math.max(best, 4);
-        else if (h.startsWith(tk) || tk.startsWith(h)) best = Math.max(best, 3);
-        else if (h.includes(tk)) best = Math.max(best, 1);
+        else if (tk.length >= 4 && (h.startsWith(tk) || tk.startsWith(h))) best = Math.max(best, 2); // "build" is not "builder"
+        else if (tk.length >= 5 && h.includes(tk)) best = Math.max(best, 1);
       }
-      if (best) { score += best; matched.push(tk); }
+      if (best) score += best;
+      // Only a word the human used EXACTLY counts as evidence of which session they meant. "build", "shop"
+      // and "billing" appear in briefs and in other sessions' names; counting them made handovers ambiguous.
+      if (best >= 4) matched.push(tk);
     }
     return { address: a.address, role: a.role, location: a.location, score, matched };
   }).filter((c) => c.score > 0).sort((x, y) => y.score - x.score);
@@ -38,4 +41,42 @@ export function rankAgents(agents: any[], query: string): { query: string; token
   // or two sessions on one machine, therefore ask instead of picking: the words did not single one out.
   const ambiguous = !top || (!!second && distinct(second) >= distinct(top)) || top.score <= 2;
   return { query, tokens, candidates: scored.slice(0, 5), best: ambiguous ? undefined : top, ambiguous };
+}
+
+/** Words that introduce the agent a message is for. A clause without one is content, not addressing. */
+const CUE = new Set("to tell ask hand pass give forward send message ping reply tell forward brief delegate".split(" "));
+
+/**
+ * A HANDOVER is a long brief with the target buried in it ("hand this over to vanness: … 12 tests pass …").
+ * Scoring the whole text lets the brief decide the target — "shop migration" and "build green" once sent a
+ * handover meant for vanness to the shop builder. So each clause is judged alone, only clauses that address
+ * someone get a say, and the votes decide: one agent named, one target; two agents named, ask; none, the
+ * model resolves it from the directory as before.
+ */
+export function pickTarget(agents: any[], text: string): { best?: Candidate; ambiguous: boolean; candidates: Candidate[]; why: string } {
+  const roleOf = (address: string) => String(agents.find((a) => a.address === address)?.role ?? "").toLowerCase();
+  const named = new Map<string, Candidate>(), placed = new Map<string, Candidate>();
+  for (const clause of String(text).split(/[;:.,\n]+/)) {
+    const raw = clause.toLowerCase().split(/[^a-z0-9_.@-]+/).filter(Boolean);
+    if (raw.length === 0 || raw.length > 25) continue;                     // a paragraph, not an address at all
+    if (!raw.some((w) => CUE.has(w))) continue;                            // "the shop migration is done" is not addressing anyone
+    const r = rankAgents(agents, clause);
+    // A session NAMED by its role is named on purpose; a place word shared by several is weaker evidence.
+    const byRole = r.candidates.filter((c) => { const role = roleOf(c.address); return role && raw.includes(role); });
+    if (byRole.length > 1) return { ambiguous: true, candidates: byRole, why: `"${clause.trim()}" names ${byRole.length} sessions` };
+    if (byRole.length === 1) { named.set(byRole[0].address, byRole[0]); continue; }
+    // A place word only counts from a SHORT clause: "the agent in the overstand workspace" addresses someone,
+    // while "then tell billing about the invoice fix" inside a brief is content that happens to name a folder.
+    if (raw.length <= 8 && r.best) { placed.set(r.best.address, r.best); continue; }
+    if (r.ambiguous && r.candidates.length > 1) {
+      const most = new Set(r.candidates[0].matched).size;
+      const tied = r.candidates.filter((c) => new Set(c.matched).size === most);
+      if (tied.length > 1) return { ambiguous: true, candidates: tied, why: `"${clause.trim()}" fits ${tied.length} sessions equally` };
+    }
+  }
+  // A session named by role outranks any number of places mentioned in passing.
+  const all = named.size ? [...named.values()] : [...placed.values()];
+  if (all.length === 1) return { best: all[0], ambiguous: false, candidates: all, why: named.size ? `"${all[0].role ?? all[0].address}" is named` : "its place is named" };
+  if (all.length > 1) return { ambiguous: true, candidates: all, why: "the message names more than one agent" };
+  return { ambiguous: false, candidates: [], why: "no agent is named" };
 }

@@ -171,7 +171,7 @@ function contextBlock(envs: Envelope[], self: string, midTask: boolean): string 
 const fail = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const parse = (r: any) => { try { return JSON.parse(r?.content?.[0]?.text ?? "{}"); } catch { return {}; } };
 
-import { rankAgents } from "./resolve.ts";
+import { rankAgents, pickTarget } from "./resolve.ts";
 
 const GUARD_DIR = fileURLToPath(new URL("../bin/guard", import.meta.url));
 
@@ -875,8 +875,10 @@ export default function (pi: ExtensionAPI) {
         let hint = "";
         try {
           const agents = parse(await call((cl) => cl.callTool({ name: "macp_roster", arguments: { all: true } }))).agents ?? [];
-          const res = rankAgents(agents.filter((a: any) => a.address !== address), args.trim());
-          if (res.best) hint = `\n\n[resolved by the directory: ${who(res.best.address)} — ${res.best.location ?? ""}. Send to that address; do not ask.]`;
+          const others = agents.filter((a: any) => a.address !== address);
+          // A handover is a long brief: judge the addressing clause, never the briefing words.
+          const res = pickTarget(others, args.trim());
+          if (res.best) hint = `\n\n[resolved by the directory: ${who(res.best.address)} — ${res.best.location ?? ""} (${res.why}). Send to that address; do not ask.]`;
           else if (res.ambiguous && res.candidates.length > 1) {
             hint = `\n\n[ambiguous: ${res.candidates.map((c) => `${who(c.address)} (${c.location ?? "?"})`).join(" | ")}. Ask the human one short question naming these; do not guess. If they name one, send to its address.]`;
           }
