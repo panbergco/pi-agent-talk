@@ -109,9 +109,35 @@ function accessKey(): string | undefined {
 const HOST = hostname().split(".")[0];
 const ME = `${userInfo().username}@${HOST}`;
 /** Where this session runs, in the words a human uses for it: machine, tmux session:window "name", folder. */
+/**
+ * Inside herdr (HERDR_ENV=1) a session's place is its workspace and tab, as the human reads them on screen:
+ * "herdr main:ufo-Code". Tab labels carry a status glyph ("● ufo-omarchy"), which is stripped. herdr prints
+ * JSON for `pane get` / `workspace get` / `tab get`; a failure degrades to the pane id, never to nothing.
+ */
+function herdrWhere(): string | null {
+  const paneId = process.env.HERDR_PANE_ID;
+  if (process.env.HERDR_ENV !== "1" || !paneId) return null;
+  const bin = process.env.HERDR_BIN_PATH || "herdr";
+  const get = (args: string[]): any => {
+    try {
+      const r = spawnSync(bin, args, { encoding: "utf8", timeout: 2000 });
+      return r.status === 0 ? JSON.parse(r.stdout)?.result : null;
+    } catch { return null; }
+  };
+  const pane = get(["pane", "get", paneId])?.pane;
+  if (!pane) return `herdr ${paneId}`;
+  const clean = (s?: string) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+  const ws = clean(get(["workspace", "get", pane.workspace_id])?.workspace?.label) || pane.workspace_id;
+  const tab = clean(get(["tab", "get", pane.tab_id])?.tab?.label);
+  const where = !tab || tab === ws ? `herdr ${ws}` : `herdr ${ws}:${tab}`;
+  return `${where} (${paneId})`;
+}
+
 function locationOf(cwd: string, sessionName?: string): string {
   const parts = [HOST];
-  if (process.env.TMUX_PANE) {
+  const herdr = herdrWhere();
+  if (herdr) parts.push(herdr);
+  else if (process.env.TMUX_PANE) {
     const r = spawnSync("tmux", ["display-message", "-p", "-t", process.env.TMUX_PANE, "#{session_name}:#{window_index} '#{window_name}'"], { encoding: "utf8", timeout: 2000 });
     if (r.status === 0 && r.stdout.trim()) parts.push(`tmux ${r.stdout.trim()}`);
   }
@@ -147,8 +173,9 @@ const GUARD_DIR = fileURLToPath(new URL("../bin/guard", import.meta.url));
 
 export default function (pi: ExtensionAPI) {
   if (process.env.MACP_OFF === "1") return;
-  // TMUX GUARD first on PATH for every command this session runs (bin/guard/tmux): no typing words
-  // into another Pi session, except in a turn the human started. MACP_TMUX_GUARD=0 turns it off.
+  // TERMINAL GUARDS first on PATH for every command this session runs: bin/guard/tmux and bin/guard/herdr,
+  // so no agent types words into another Pi session — in tmux or in herdr — except in a turn the human
+  // started. MACP_TMUX_GUARD=0 turns both off. Same directory, so one PATH entry serves both.
   if (process.env.MACP_TMUX_GUARD !== "0" && existsSync(join(GUARD_DIR, "tmux")) && !(process.env.PATH ?? "").split(":").includes(GUARD_DIR)) {
     process.env.PATH = `${GUARD_DIR}:${process.env.PATH ?? ""}`;
   }

@@ -32,7 +32,7 @@
   "homepage": "https://github.com/panbergco/pi-agent-talk",
   "scripts": {
     "build": "cd center && npm install --include=dev --no-audit --no-fund && npx tsc",
-    "test": "cd center && npm test && cd .. && bin/guard/test.sh",
+    "test": "cd center && npm test && cd .. && bin/guard/test.sh && bin/guard/test-herdr.sh",
     "prepublishOnly": "npm run build && git diff --exit-code center/dist && npm test"
   },
   "engines": {
@@ -48,7 +48,8 @@
     "README.md",
     "LICENSE",
     "bin/macp",
-    "bin/guard/tmux"
+    "bin/guard/tmux",
+    "bin/guard/herdr"
   ],
   "bin": {
     "macp": "bin/macp"

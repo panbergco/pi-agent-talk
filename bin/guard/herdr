@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# herdr guard (pi-agent-talk) — first on PATH beside the tmux guard, for every command a Pi session runs.
+#
+# BLOCKS an agent typing WORDS into ANOTHER Pi pane through herdr — `pane send-text`, `pane run`,
+# `agent prompt`. That is agents talking to each other behind pi-agent-talk's rules, and the other
+# model receives it as though the human had typed it.
+#
+# KEEPS everything troubleshooting needs: your own pane, panes that are not running Pi, key presses
+# (`pane send-keys`), slash commands (except /talk), @file pastes, anything at all in a turn the human
+# started (PI_HUMAN_TURN=1, set by the extension), and a trusted orchestrator's own door.
+#
+# Trusted orchestrators: ~/.config/macp-center/orchestrators, one real path or glob per line;
+# MACP_GUARD_ORCHESTRATORS (": " -list) adds. A guardrail against noise, not security: /usr/bin/herdr
+# bypasses it. MACP_TMUX_GUARD=0 disables both guards.
+# Log: ~/.local/state/pi-agent-talk/tmux-guard.log (shared with the tmux guard)
+set -u
+self=$(dirname "$(readlink -f "$0")")
+REAL=$(PATH=$(printf %s "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd:) command -v herdr) || { echo "herdr guard: real herdr not found" >&2; exit 127; }
+
+# Fast path: only the commands that write words into a pane are looked at.
+case " $* " in *" send-text "*|*" run "*|*" prompt "*) ;; *) exec "$REAL" "$@" ;; esac
+[ "${MACP_TMUX_GUARD:-1}" = "0" ] && exec "$REAL" "$@"
+
+log() { local d="${XDG_STATE_HOME:-$HOME/.local/state}/pi-agent-talk"; mkdir -p "$d"; printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$1" "${MACP_SELF:-?}" "$2" "${3:0:120}" >> "$d/tmux-guard.log"; }
+
+# ── who is calling: the orchestrator's own door decides for itself ─────────
+orch=()
+f="${MACP_GUARD_ORCHESTRATORS_FILE:-$HOME/.config/macp-center/orchestrators}"
+[ -r "$f" ] && while IFS= read -r l; do [[ -n "$l" && "$l" != \#* ]] && orch+=("$l"); done < "$f"
+IFS=: read -r -a extra <<< "${MACP_GUARD_ORCHESTRATORS:-}"; for l in "${extra[@]}"; do [ -n "$l" ] && orch+=("$l"); done
+is_orch() { local x=$1 o; [ -z "$x" ] && return 1; for o in "${orch[@]}"; do [[ "$x" == $o ]] && return 0; done; return 1; }
+p=$PPID
+for _ in 1 2 3 4 5 6; do
+  [ "$p" -le 1 ] 2>/dev/null && break
+  mapfile -d '' -t av < /proc/$p/cmdline 2>/dev/null || av=()
+  r0=$(readlink -f "${av[0]:-/}" 2>/dev/null); r1=$(readlink -f "${av[1]:-/}" 2>/dev/null)
+  if [ ${#orch[@]} -gt 0 ] && { is_orch "$r0" || is_orch "$r1"; }; then log allow-orchestrator "-" "$*"; exec "$REAL" "$@"; fi
+  p=$(awk '{print $4}' /proc/$p/stat 2>/dev/null || echo 1)
+done
+
+allowed_text() { # text that is repair, not conversation
+  local t="$1"
+  [[ -z "$t" ]] && return 0
+  [[ "$t" =~ ^/talk([[:space:]]|$) ]] && return 1           # /talk would speak with the human's authority
+  [[ "$t" =~ ^/[A-Za-z] ]] && return 0                      # slash commands: /reload, /compact …
+  [[ "$t" =~ ^@[^[:space:]]+[[:space:]]?$ ]] && return 0    # an @file paste
+  return 1
+}
+pane_agent() { "$REAL" pane get "$1" 2>/dev/null | sed -n 's/.*"agent":"\([^"]*\)".*/\1/p' | head -1; }
+
+# ── the writing subcommands: pane send-text <pane> <text>, pane run <pane> <cmd…>, agent prompt <target> <text> ──
+args=("$@"); sub=""; target=""; text=""
+for i in "${!args[@]}"; do
+  case "${args[$i]}" in
+    send-text|run|prompt) sub=${args[$i]}; target=${args[$((i+1))]:-}; text="${args[*]:$((i+2))}"; break;;
+  esac
+done
+[ -z "$sub" ] && exec "$REAL" "$@"
+[ -z "$target" ] && exec "$REAL" "$@"
+[ "${HERDR_PANE_ID:-}" = "$target" ] && { log allow-self "$target" "$text"; exec "$REAL" "$@"; }
+
+# An agent prompt asks another agent to work: never from an agent's own initiative.
+if [ "$sub" != "prompt" ]; then
+  a=$(pane_agent "$target")
+  [ -n "$a" ] && [ "$a" != "pi" ] && { log allow-not-pi "$target" "$text"; exec "$REAL" "$@"; }
+fi
+[ "${PI_HUMAN_TURN:-0}" = "1" ] && { log allow-human-turn "$target" "$text"; exec "$REAL" "$@"; }
+allowed_text "$text" && { log allow-text "$target" "$text"; exec "$REAL" "$@"; }
+
+log block "$target" "$text"
+cat >&2 <<EOF
+herdr guard: writing into another Pi session (pane ${target}) is blocked — it lets agents talk to each
+other behind pi-agent-talk's rules, and the other model receives it as if the human typed it.
+  Use macp_send (or pi-agent-talk's /talk for the human). Keys, your own pane, panes not running Pi,
+  slash commands, @file pastes and anything in a human-started turn are allowed.
+EOF
+exit 1
