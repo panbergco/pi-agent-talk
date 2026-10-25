@@ -130,6 +130,20 @@ That is all. The hub ships compiled. Sessions start a local hub themselves when 
 
 From a clone, for development: `npm install`, `npm run build` (recompiles `center/dist`), `npm test`.
 
+## Where a session says it is
+
+A session reports the place a human sees it in:
+
+| Terminal | Reported as |
+|---|---|
+| herdr | `desk · herdr overstand (w4:p2) · ~/Code/overstand-private` — herdr's workspace label and pane |
+| tmux | `desk · tmux main:2 'billing-review' · ~/Code/billing` |
+| neither | `desk · ~/Code/billing` |
+
+`/talk` then takes the human's own words: *"tell the agent in the overstand workspace …"*, *"the freecad one"*,
+*"vanness"*. The directory decides when one session clearly fits, sends straight to it, and when two fit
+equally it says so and the model asks which — it never picks between them.
+
 ## Use
 
 The model gets four tools: `macp_send`, `macp_roster`, `macp_status` and `macp_ack`. The human types:

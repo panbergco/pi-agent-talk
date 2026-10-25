@@ -283,3 +283,20 @@ Qwen (one request at a time), this model serves requests in parallel, so six ses
 Harness fix found while setting it up: `--no-extensions` also removes the extension that provides the
 `ollama-cloud` provider, so the model disappeared from the session. The harness now names that provider
 extension explicitly.
+
+## L18 · herdr (2026-10-25 night)
+
+A **separate** herdr server (`herdr --session pat-test`), Pi sessions started inside its panes, a throwaway hub.
+
+| What | Result |
+|---|---|
+| A session's place | reported as `ufo · herdr overstand (w2:p1) · /var/tmp/pat-herdr` — herdr's workspace label, pane id; an unnamed tab's number is dropped |
+| Inside herdr, `TMUX` is also set (the server inherited it) | the herdr place wins over the tmux one |
+| Loose words: *"tell the agent in the overstand workspace to reply with PONG-HERDR"* | resolved uniquely (`[resolved by the directory: vanness …]`), delivered as *asked by dm@ufo*, answered `PONG-HERDR`, answer read back |
+| Ambiguous words: *"tell the agent in herdr to say HI"* | **nothing sent**; the candidates were listed and the model asked which one |
+| The human's answer *"vanness"* | sent `say HI`, read by vanness, answered `HI` |
+| Guard: `herdr pane send-text/run/agent prompt` | 16/16 tests (own pane, non-Pi panes, keys, slash commands, @file, human turn, orchestrator allowed; words into another Pi pane blocked) |
+
+Two defects found and fixed on the way: a project name was matched with its `prj:` prefix (so one of two lanes
+in the same project looked unique), and a tie was judged by score rather than by *which words* matched — both
+now ask instead of guessing. `test/resolve.mjs` pins eleven phrases, including the two ties.
