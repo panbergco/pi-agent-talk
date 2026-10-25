@@ -324,7 +324,7 @@ Three sessions on a throwaway hub (writer, reviewer, builder), local Qwen3.8, af
 
 | Finding | Was | Now, measured live |
 |---|---|---|
-| The finder tool could not run at all (`handler` instead of `execute`, `ok_` undefined) | `TypeError: find.execute is not a function` | ran for real: returned `agent://pi/01a1750f-… builder (…05c792) ufo · tmux builder:1 …` |
+| The finder tool could not run at all (`handler` instead of `execute`, `ok_` undefined) | `TypeError: find.execute is not a function` | ran for real: returned `agent://pi/01a1750f-… builder (…05c792) desk · tmux builder:1 …` |
 | Brief content or a negation decided the recipient | "hand over to the reviewer: tell the builder the tests pass" resolved to **builder** | same words resolved to the **reviewer**; delivery `writer → reviewer` only, *asked by you*, nothing to builder |
 | "prepare/draft" still carried "send to that address; do not ask" | conflicting instructions in one prompt | "prepare a handover … do not send yet": deliveries before **1**, after **1** — nothing sent; the model wrote a draft and said so |
 
