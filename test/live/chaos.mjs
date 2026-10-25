@@ -10,6 +10,7 @@
  */
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -53,7 +54,10 @@ function launch(i, resumeFile) {
   const env = Object.entries({ ...ENV, MACP_ROLE: `c${i}` }).map(([k, v]) => `${k}=${v}`).join(" ");
   const sess = resumeFile ? `--session ${resumeFile}` : `--session-dir ${dir}`;
   tmux("kill-session", "-t", name);
-  tmux("new-session", "-d", "-s", name, "-x", "150", "-y", "45", "-c", dir, `env ${env} pi --no-extensions --no-skills -e ${ROOT} --model ${MODEL} ${sess}`);
+  // --no-extensions keeps the test hermetic, so the model's provider extension must be named explicitly
+  // (the ollama-cloud provider comes from an extension, not from Pi's core).
+  const providerExt = MODEL.startsWith("ollama-cloud/") ? ` -e ${join(homedir(), "Code", "pi-ollama-cloud")}` : "";
+  tmux("new-session", "-d", "-s", name, "-x", "150", "-y", "45", "-c", dir, `env ${env} pi --no-extensions --no-skills -e ${ROOT}${providerExt} --model ${MODEL} ${sess}`);
   sessions[i] = { i, name, dir, role: `c${i}` };
 }
 const sessionFile = (i) => { const d = sessions[i].dir; const f = readdirSync(d).filter((x) => x.endsWith(".jsonl")); return f.length ? join(d, f.sort().at(-1)) : null; };

@@ -268,3 +268,18 @@ read from the hub's database and every session's conversation file.
 | 3 | 30 | 8, interrupt-heavy | 64/68 | 0 duplicates across 21 interrupts (fix holds). The 4 misses were one agent's model declining to message the human on another agent's say-so (model judgement, not delivery). Test measure fixed |
 | 4 | 20 | 4 | 50/52 | **a message lost**: queued for a busy session, then the run was cancelled by an interrupt; Pi drops its steering queue on cancel. Reproduced (2 messages, an interrupt), **fixed** (anything queued but never seen by a model call is placed again after the run), verified 3/3 with a control on the old code (not read) |
 | 5 | 25 | 7 (kill -9 hub ×2, hub stop, freezes ×2, kill -9 session, reload) | **60/60** | none. 0 duplicates, 0 user-role, 0 identity conflicts, 0 placed-but-unread |
+
+## L17 · Chaos, round 6: DeepSeek v4.1 (a different model, six sessions)
+
+Same harness, `ollama-cloud/deepseek-v4.1-flash`, 6 sessions, 20 minutes, interrupts weighted. Unlike the local
+Qwen (one request at a time), this model serves requests in parallel, so six sessions worked concurrently.
+
+| | |
+|---|---|
+| Tasks met | **54/54** (11 agent-to-agent relays + 11 acknowledgements, 9 interrupts, 8 replies, 6 busy-session steers, 3 notes) |
+| Invariants | 0 duplicates, 0 messages shown as user input, 0 identity conflicts, 0 placed-but-unread |
+| Faults | 5: `/reload`, `kill -9` of the hub twice, a clean hub stop, `SIGSTOP` for 100 s |
+
+Harness fix found while setting it up: `--no-extensions` also removes the extension that provides the
+`ollama-cloud` provider, so the model disappeared from the session. The harness now names that provider
+extension explicitly.
