@@ -13,7 +13,14 @@
 # Log: ~/.local/state/pi-agent-talk/tmux-guard.log
 set -u
 self=$(dirname "$(readlink -f "$0")")
-REAL=$(PATH=$(printf %s "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd:) command -v tmux) || { echo "tmux guard: real tmux not found" >&2; exit 127; }
+# The real binary: the first PATH entry that is not a guard directory (another checkout of this package may
+# put ITS guard on PATH — resolving that would run a guard as if it were tmux).
+rp=""
+while IFS= read -r d; do
+  [ -n "$d" ] && [ -x "$d/tmux" ] && [ "$(basename "$d")" != "guard" ] && { rp="$d/tmux"; break; }
+done < <(printf %s "$PATH" | tr ':' '\n')
+[ -n "$rp" ] || { echo "tmux guard: real tmux not found" >&2; exit 127; }
+REAL=$rp
 
 # Fast path: only typing commands are looked at.
 case " $* " in *" send"*|*" paste"*) ;; *) exec "$REAL" "$@" ;; esac
@@ -53,7 +60,7 @@ for _ in 1 2 3 4 5 6; do
   if [ ${#orch[@]} -gt 0 ] && { is_orch "$r0" || is_orch "$r1"; }; then
     log allow-orchestrator "-" "$*"; exec "$REAL" "$@"
   fi
-  p=$(awk '{print $4}' /proc/$p/stat 2>/dev/null || echo 1)
+  p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d " "); [ -n "$p" ] || p=1
 done
 human=${PI_HUMAN_TURN:-0}
 

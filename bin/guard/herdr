@@ -15,7 +15,14 @@
 # Log: ~/.local/state/pi-agent-talk/tmux-guard.log (shared with the tmux guard)
 set -u
 self=$(dirname "$(readlink -f "$0")")
-REAL=$(PATH=$(printf %s "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd:) command -v herdr) || { echo "herdr guard: real herdr not found" >&2; exit 127; }
+# The real binary: the first PATH entry that is not a guard directory (another checkout of this package may
+# put ITS guard on PATH — resolving that would run a guard as if it were herdr).
+rp=""
+while IFS= read -r d; do
+  [ -n "$d" ] && [ -x "$d/herdr" ] && [ "$(basename "$d")" != "guard" ] && { rp="$d/herdr"; break; }
+done < <(printf %s "$PATH" | tr ':' '\n')
+[ -n "$rp" ] || { echo "herdr guard: real herdr not found" >&2; exit 127; }
+REAL=$rp
 
 # Fast path: only the commands that write words into a pane are looked at.
 case " $* " in *" send-text "*|*" run "*|*" prompt "*) ;; *) exec "$REAL" "$@" ;; esac
@@ -35,7 +42,7 @@ for _ in 1 2 3 4 5 6; do
   mapfile -d '' -t av < /proc/$p/cmdline 2>/dev/null || av=()
   r0=$(readlink -f "${av[0]:-/}" 2>/dev/null); r1=$(readlink -f "${av[1]:-/}" 2>/dev/null)
   if [ ${#orch[@]} -gt 0 ] && { is_orch "$r0" || is_orch "$r1"; }; then log allow-orchestrator "-" "$*"; exec "$REAL" "$@"; fi
-  p=$(awk '{print $4}' /proc/$p/stat 2>/dev/null || echo 1)
+  p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d " "); [ -n "$p" ] || p=1
 done
 
 allowed_text() { # text that is repair, not conversation

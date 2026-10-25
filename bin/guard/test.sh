@@ -9,6 +9,7 @@ tm() { /usr/bin/tmux -L $S -f /dev/null "$@"; }
 tm new-session -d -s t -n pipane -x 150 -y 30 "$G/pi --norc -c 'trap \"\" INT QUIT TSTP; while IFS= read -r l; do echo GOT:\$l; done'"
 tm new-window -t t -n bashpane "bash --norc"; sleep 0.6
 export MACP_GUARD_SOCKET="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$S" XDG_STATE_HOME="$G/state" MACP_GUARD_ORCHESTRATORS_FILE=/dev/null MACP_GUARD_ORCHESTRATORS="$G/inst/orch"
+unset PI_HUMAN_TURN MACP_TMUX_GUARD 2>/dev/null || true   # the caller's turn must not silence the suite
 pass=0; fail=0
 expect() { local want=$1 desc=$2; shift 2; local out got; out=$("$@" 2>&1); echo "$out" | grep -q 'tmux guard:' && got=BLOCKED || got=allowed
   if [ "$got" = "$want" ]; then pass=$((pass+1)); echo "PASS  $desc"; else fail=$((fail+1)); echo "FAIL  $desc (got $got)"; fi; }
