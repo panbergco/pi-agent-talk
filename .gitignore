@@ -1,5 +1,5 @@
 node_modules/
 .scratch/
-dist/
+center/node_modules/
 center/test/*.db*
 center/test/*.json

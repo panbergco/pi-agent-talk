@@ -119,15 +119,13 @@ An agent sender is told once, at `info` priority, when its message fails.
 ## Install
 
 ```bash
-git clone https://github.com/panbergco/pi-agent-talk ~/Code/pi-agent-talk
-cd ~/Code/pi-agent-talk && npm install       # also builds the hub (Node 22.13+, for node:sqlite)
-
-node center/dist/index.js                    # http://127.0.0.1:7737/mcp; data in ~/.local/state/macp-center/
-pi install ~/Code/pi-agent-talk              # every Pi session; or: pi -e ~/Code/pi-agent-talk
+pi install git:github.com/panbergco/pi-agent-talk     # every Pi session (add -l for this project only)
 ```
 
-Sessions start a local hub themselves if none is running. For a permanent one, use
-`center/macp-center.service` (systemd user unit).
+That is all. The hub ships compiled. Sessions start a local hub themselves when none is running
+(Node 22.13+, for `node:sqlite`). For a permanent hub, use `center/macp-center.service` (systemd user unit).
+
+From a clone, for development: `npm install`, `npm run build` (recompiles `center/dist`), `npm test`.
 
 ## Use
 

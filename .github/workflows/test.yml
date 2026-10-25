@@ -11,8 +11,10 @@ jobs:
           node-version: 24
       - name: tmux (for the guard test)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
-      - name: install (builds the hub)
+      - name: install
         run: npm install --no-audit --no-fund
+      - name: the shipped hub build matches its source
+        run: npm run build && git diff --exit-code center/dist
       - name: hub tests
         run: cd center && npm test
       - name: tmux guard test

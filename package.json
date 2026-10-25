@@ -17,7 +17,8 @@
     ]
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
@@ -30,10 +31,25 @@
   },
   "homepage": "https://github.com/panbergco/pi-agent-talk",
   "scripts": {
-    "prepare": "cd center && npm install --no-audit --no-fund && npx tsc",
-    "test": "cd center && npm test && cd .. && bin/guard/test.sh"
+    "build": "cd center && npm install --include=dev --no-audit --no-fund && npx tsc",
+    "test": "cd center && npm test && cd .. && bin/guard/test.sh",
+    "prepublishOnly": "npm run build && git diff --exit-code center/dist && npm test"
   },
   "engines": {
     "node": ">=22.13"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "center/dist/",
+    "center/macp-center.service",
+    "center/LICENSE",
+    "center/NOTICE",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "macp": "bin/macp"
   }
 }
