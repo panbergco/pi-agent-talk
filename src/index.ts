@@ -174,6 +174,12 @@ export default function (pi: ExtensionAPI) {
   let myKey: string | undefined;
   let registeredAs = ""; // role|project this session registered with (role map changes re-register)
   let interruptHeld: Envelope[] = [];
+  // STEERED BUT NOT YET SEEN: a message handed to Pi's steering queue lives there until the next model call.
+  // Cancelling the run (an interrupt, Esc, another extension) throws that queue away — measured 2026-10-25,
+  // chaos round 4 and a two-message reproduction. Each one stays here until a model call's context contains it;
+  // whatever is still here when the run ends was dropped, and is placed again.
+  const steerPending = new Map<string, Envelope>();
+  const lost = new Set<string>();
   let interruptFrom: string | undefined; // set while an MACP interrupt is cancelling the running step
   const delivered = new Set<string>();
   // TRANSPARENCY: names for addresses, and receipts for what this session sent. Receipt and
@@ -406,10 +412,12 @@ export default function (pi: ExtensionAPI) {
   function place(envs: Envelope[]): void {
     // THE ONE CHOKE POINT: never place an id twice, whichever path calls this. Measured 2026-10-25 (chaos round 2):
     // an interrupt's held batch was placed 150 ms after the run ended, and a mail check in that window placed it too.
-    envs = envs.filter((e) => !delivered.has(e.id));
+    envs = envs.filter((e) => !delivered.has(e.id) || lost.has(e.id));
+    for (const e of envs) lost.delete(e.id);
     if (envs.length === 0 || !address) return;
     const wakes = envs.some((e) => RANK[e.priority] <= RANK.steering);
     const midTask = busy();
+    if (midTask) for (const e of envs) steerPending.set(e.id, e); // steered, or held by Pi to the end of the step
     pi.sendMessage(
       { customType: CUSTOM_TYPE, content: contextBlock(envs, address, midTask), display: true, details: { envelopes: envs, midTask } },
       wakes ? { deliverAs: "steer", triggerTurn: true } : { triggerTurn: false }, // §8.2: advisory/info never wake
@@ -436,6 +444,9 @@ export default function (pi: ExtensionAPI) {
   });
 
   function trackRead(messages: any[]): void {
+    if (steerPending.size) for (const m of messages) {
+      if (m?.role === "custom" && m.customType === CUSTOM_TYPE) for (const e of m.details?.envelopes ?? []) steerPending.delete(e.id);
+    }
     if (awaitRead.size === 0) return;
     const ids: string[] = [];
     for (const m of messages) {
@@ -550,9 +561,11 @@ export default function (pi: ExtensionAPI) {
     ctx = c;
     humanTurn = false; setHumanTurn(false);
     presence("idle");
-    if (interruptHeld.length === 0) return;
-    const held = interruptHeld; interruptHeld = [];
-    setTimeout(() => { interruptFrom = undefined; place(held); }, 150); // let the aborted run settle, then start the new turn (I2)
+    const dropped = [...steerPending.values()]; steerPending.clear();
+    for (const e of dropped) lost.add(e.id);
+    if (interruptHeld.length === 0 && dropped.length === 0) return;
+    const held = [...dropped, ...interruptHeld.filter((e) => !dropped.some((d) => d.id === e.id))]; interruptHeld = [];
+    setTimeout(() => { interruptFrom = undefined; place(held); }, 150); // let the cancelled run settle, then start the new turn (I2)
   });
 
   pi.on("session_shutdown", async () => {
