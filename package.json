@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-talk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Agent-to-agent messaging for Pi over MACP 2.0: messages enter as attributed custom messages at the next inference boundary \u2014 never through the prompt box, never in the human's input history.",
   "type": "module",
   "license": "Apache-2.0",
@@ -32,7 +32,7 @@
   "homepage": "https://github.com/panbergco/pi-agent-talk",
   "scripts": {
     "build": "cd center && npm install --include=dev --no-audit --no-fund && npx tsc",
-    "test": "node test/resolve.mjs && cd center && npm test && cd .. && bin/guard/test.sh && bin/guard/test-herdr.sh",
+    "test": "node test/resolve.mjs && node test/tools.mjs && cd center && npm test && cd .. && bin/guard/test.sh && bin/guard/test-herdr.sh",
     "prepublishOnly": "npm run build && git diff --exit-code center/dist && npm test"
   },
   "engines": {

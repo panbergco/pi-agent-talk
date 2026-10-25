@@ -53,10 +53,23 @@ allowed_text() { # text that is repair, not conversation
   [[ "$t" =~ ^@[^[:space:]]+[[:space:]]?$ ]] && return 0    # an @file paste
   return 1
 }
-pane_agent() { "$REAL" pane get "$1" 2>/dev/null | sed -n 's/.*"agent":"\([^"]*\)".*/\1/p' | head -1; }
+# ── which herdr server the call targets, and which one we are in ────────────
+# `--session X` (or `--remote HOST`) selects another server. Reading a pane through the wrong server would
+# inspect a DIFFERENT pane that merely shares the id (w1:p1 exists in every server), so the selector is kept
+# and passed to every lookup, and a foreign server is never treated as "my own pane".
+args=("$@")
+globals=(); selSession=""; foreign=0
+for ((j=0; j<${#args[@]}; j++)); do
+  case "${args[$j]}" in
+    --session) globals+=(--session "${args[$((j+1))]:-}"); selSession=${args[$((j+1))]:-}; j=$((j+1));;
+    --remote)  globals+=(--remote "${args[$((j+1))]:-}"); foreign=1; j=$((j+1));;
+  esac
+done
+if [ -n "$selSession" ] && [ "$selSession" != "${HERDR_SESSION:-}" ]; then foreign=1; fi
+pane_agent() { "$REAL" "${globals[@]}" pane get "$1" 2>/dev/null | sed -n 's/.*"agent":"\([^"]*\)".*/\1/p' | head -1; }
 
 # ── the writing subcommands: pane send-text <pane> <text>, pane run <pane> <cmd…>, agent prompt <target> <text> ──
-args=("$@"); sub=""; target=""; text=""
+sub=""; target=""; text=""
 for i in "${!args[@]}"; do
   case "${args[$i]}" in
     send-text|run|prompt) sub=${args[$i]}; target=${args[$((i+1))]:-}; text="${args[*]:$((i+2))}"; break;;
@@ -64,7 +77,7 @@ for i in "${!args[@]}"; do
 done
 [ -z "$sub" ] && exec "$REAL" "$@"
 [ -z "$target" ] && exec "$REAL" "$@"
-[ "${HERDR_PANE_ID:-}" = "$target" ] && { log allow-self "$target" "$text"; exec "$REAL" "$@"; }
+[ "$foreign" = 0 ] && [ "${HERDR_PANE_ID:-}" = "$target" ] && { log allow-self "$target" "$text"; exec "$REAL" "$@"; }
 
 # An agent prompt asks another agent to work: never from an agent's own initiative.
 if [ "$sub" != "prompt" ]; then

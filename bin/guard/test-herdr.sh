@@ -10,11 +10,13 @@ printf '#!/bin/bash\n"$@"\n' > "$G/inst/orch"; cp "$G/inst/orch" "$G/evil/orch";
 cat > "$G/bin/herdr" <<STUB
 #!/bin/bash
 printf '%s\n' "\$*" >> "$G/reached"
+# Two servers share pane ids: in this one w1:p1 is Pi, on "foreign" w1:p1 is Pi too but w1:p2 is bash.
+ses=""; while [ \$# -gt 0 ]; do case "\$1" in --session) ses=\$2; shift 2;; *) break;; esac; done
 case "\$1 \$2" in
   "pane get")
-    case "\$3" in
-      w1:p1) echo '{"id":"cli:pane:get","result":{"pane":{"pane_id":"w1:p1","agent":"pi","workspace_id":"w1","tab_id":"w1:t1"},"type":"pane_info"}}';;
-      w1:p2) echo '{"id":"cli:pane:get","result":{"pane":{"pane_id":"w1:p2","agent":"bash","workspace_id":"w1","tab_id":"w1:t2"},"type":"pane_info"}}';;
+    case "\$ses:\$3" in
+      :w1:p1|foreign:w1:p1) echo '{"id":"cli:pane:get","result":{"pane":{"pane_id":"w1:p1","agent":"pi","workspace_id":"w1","tab_id":"w1:t1"},"type":"pane_info"}}';;
+      :w1:p2|foreign:w1:p2) echo '{"id":"cli:pane:get","result":{"pane":{"pane_id":"w1:p2","agent":"bash","workspace_id":"w1","tab_id":"w1:t2"},"type":"pane_info"}}';;
       *) echo '{"error":"no such pane"}' >&2; exit 1;;
     esac;;
 esac
@@ -45,6 +47,10 @@ expect BLOCKED "words from a script named like it"   "$G/evil/orch" herdr pane s
 expect allowed "reading a pane"                      herdr pane get w1:p1
 expect allowed "listing panes"                       herdr pane list
 expect allowed "guard switched off"                  env MACP_TMUX_GUARD=0 herdr pane send-text w1:p1 "off"
+# ── session boundaries: w1:p1 exists on every herdr server, so the selector decides which pane is meant ──
+expect BLOCKED "a Pi pane on another herdr session"  herdr --session foreign pane send-text w1:p1 "cross server"
+expect BLOCKED "own pane id, but a foreign session"  env HERDR_SESSION=local herdr --session foreign pane send-text w1:p9 "cross server"
+expect allowed "a non-Pi pane on another session"    herdr --session foreign pane send-text w1:p2 "echo fixing"
 sleep 0.2
 leak=$(grep -cE 'send-text w1:p1 (hey reviewer|/talk|human ok|door ok|off)|run w1:p1 echo hi|prompt reviewer|send-text w1:p1 evil' "$G/reached" 2>/dev/null || true)
 # human turn, orchestrator and the off switch are ALLOWED, so only the blocked ones must be absent:

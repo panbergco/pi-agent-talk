@@ -28,8 +28,7 @@ rows):
 | Steering another needs permission | 🟡 | ❌ | 🟡 | ❌ | ✅ |
 | **Messaging capabilities delivered (of 36)** | 8 | 15 | 18 | 17 | **31** |
 
-What it costs: a background hub process, no rate limits yet, and the roster shows live/offline but not
-busy/idle.
+What it costs: a background hub process, and rules and roster files that have to exist on the hub's machine.
 
 ## What it looks like — real output
 
@@ -136,17 +135,19 @@ A session reports the place a human sees it in:
 
 | Terminal | Reported as |
 |---|---|
-| herdr | `desk · herdr overstand (w4:p2) · ~/Code/overstand-private` — herdr's workspace label and pane |
+| herdr | `desk · herdr review (w4:p2) · ~/Code/review-project` — herdr's workspace label and pane |
 | tmux | `desk · tmux main:2 'billing-review' · ~/Code/billing` |
 | neither | `desk · ~/Code/billing` |
 
-`/talk` then takes the human's own words: *"tell the agent in the overstand workspace …"*, *"the freecad one"*,
-*"vanness"*. The directory decides when one session clearly fits, sends straight to it, and when two fit
-equally it says so and the model asks which — it never picks between them.
+`/talk` then takes the human's own words: *"tell the agent in the review workspace …"*, *"the freecad one"*,
+*"vanness"*. The directory resolves them to an address and hands that to the model, which composes and sends the
+message. The addressing clause decides, never the briefing: "hand over to the reviewer" stays addressed to the
+reviewer even when the brief mentions the builder. When two sessions fit equally it says so and the model asks
+which — it never picks between them. "Prepare" or "draft" means write it here and wait; nothing is sent.
 
 ## Use
 
-The model gets four tools: `macp_send`, `macp_roster`, `macp_status` and `macp_ack`. The human types:
+The model gets five tools: `macp_send`, `macp_find`, `macp_roster`, `macp_status` and `macp_ack`. The human types:
 
 | Command | Does |
 |---|---|
@@ -180,8 +181,8 @@ rules by role, never by name, so that a new role needs no edit.
 ### Talk in plain words
 
 `/talk tell the billing review agent on server the export is ready` — the model looks the agent up
-in the directory of every live session, in every project and on every machine. Each session reports
-its machine, tmux session, window number and name, folder, and Pi session name. If more than one agent
+in the directory of every live session, in every project and on every machine. Each session reports its
+machine, its place (herdr workspace and pane, or tmux session:window "name"), folder, and Pi session name. If more than one agent
 fits, the model asks you which. The message carries your authority and arrives labelled
 `(asked by you@host)`. The recipient may answer it **once**, to you.
 

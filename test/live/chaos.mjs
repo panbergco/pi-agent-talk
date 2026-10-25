@@ -4,7 +4,7 @@
  * injected while they run (kill -9 a session, kill -9 the hub, freeze a session, /reload, restart the hub).
  * At the end it checks invariants from the hub's database and every session's conversation file.
  *
- *   node test/live/chaos.mjs [--sessions 5] [--minutes 45] [--model ufo/qwen3.8-27b:low] [--port 7785]
+ *   node test/live/chaos.mjs [--sessions 5] [--minutes 45] [--model desk/qwen3.8-27b:low] [--port 7785]
  *
  * Needs tmux and pi. Runs everything on the isolated tmux server `-L pi-harness` and in .scratch/chaos/.
  */
@@ -22,7 +22,7 @@ const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
 const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js");
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
-const N = Number(arg("sessions", 5)), MINUTES = Number(arg("minutes", 45)), MODEL = arg("model", "ufo/qwen3.8-27b:low");
+const N = Number(arg("sessions", 5)), MINUTES = Number(arg("minutes", 45)), MODEL = arg("model", "desk/qwen3.8-27b:low");
 const PORT = Number(arg("port", 7785)), URL_ = `http://127.0.0.1:${PORT}/mcp`;
 const DIR = join(ROOT, ".scratch", "chaos"), DB = join(DIR, "hub.db"), POLICY = join(DIR, "policy.json"), LOG = join(DIR, "chaos.log");
 const OPKEY = "chaos-operator-" + process.pid;

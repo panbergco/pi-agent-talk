@@ -286,13 +286,13 @@ extension explicitly.
 
 ## L18 · herdr (2026-10-25 night)
 
-A **separate** herdr server (`herdr --session pat-test`), Pi sessions started inside its panes, a throwaway hub.
+A **separate** herdr server (`herdr --session review-test`), Pi sessions started inside its panes, a throwaway hub.
 
 | What | Result |
 |---|---|
-| A session's place | reported as `ufo · herdr overstand (w2:p1) · /var/tmp/pat-herdr` — herdr's workspace label, pane id; an unnamed tab's number is dropped |
+| A session's place | reported as `desk · herdr review (w2:p1) · /var/tmp/pat-herdr` — herdr's workspace label, pane id; an unnamed tab's number is dropped |
 | Inside herdr, `TMUX` is also set (the server inherited it) | the herdr place wins over the tmux one |
-| Loose words: *"tell the agent in the overstand workspace to reply with PONG-HERDR"* | resolved uniquely (`[resolved by the directory: vanness …]`), delivered as *asked by dm@ufo*, answered `PONG-HERDR`, answer read back |
+| Loose words: *"tell the agent in the review workspace to reply with PONG-HERDR"* | resolved uniquely (`[resolved by the directory: vanness …]`), delivered as *asked by dm@desk*, answered `PONG-HERDR`, answer read back |
 | Ambiguous words: *"tell the agent in herdr to say HI"* | **nothing sent**; the candidates were listed and the model asked which one |
 | The human's answer *"vanness"* | sent `say HI`, read by vanness, answered `HI` |
 | Guard: `herdr pane send-text/run/agent prompt` | 16/16 tests (own pane, non-Pi panes, keys, slash commands, @file, human turn, orchestrator allowed; words into another Pi pane blocked) |
@@ -308,7 +308,7 @@ Bob did a small piece of work (wrote a 3-line file), then was told only: `/talk 
 brief is written. What arrived at alice (324 chars, steering, *asked by you*, read):
 
 ```
-Handover — file work on /var/tmp/handover-test.txt (ufo).
+Handover — file work on /var/tmp/handover-test.txt (desk).
 Done so far:
 - File created at /var/tmp/handover-test.txt via `printf 'a\nb\nc\n'`
 - Verified with `wc -l`: 3 lines (contents: a, b, c)
@@ -317,3 +317,17 @@ Your turn: take over any further work on that file. No branch or session state i
 
 Not a forwarding of the human's three words: the model wrote done / your turn / where. Guidance now says a handover
 means "compose the brief from what you actually know", and that "prepare"/"draft" means show it and wait for the go-ahead.
+
+## L20 · The review's findings, fixed and re-proved live (2026-10-26)
+
+Three sessions on a throwaway hub (writer, reviewer, builder), local Qwen3.8, after the repairs below.
+
+| Finding | Was | Now, measured live |
+|---|---|---|
+| The finder tool could not run at all (`handler` instead of `execute`, `ok_` undefined) | `TypeError: find.execute is not a function` | ran for real: returned `agent://pi/01a1750f-… builder (…05c792) ufo · tmux builder:1 …` |
+| Brief content or a negation decided the recipient | "hand over to the reviewer: tell the builder the tests pass" resolved to **builder** | same words resolved to the **reviewer**; delivery `writer → reviewer` only, *asked by you*, nothing to builder |
+| "prepare/draft" still carried "send to that address; do not ask" | conflicting instructions in one prompt | "prepare a handover … do not send yet": deliveries before **1**, after **1** — nothing sent; the model wrote a draft and said so |
+
+Unit-level, the matcher now pins 26 phrases including both of the review's failures, and `test/tools.mjs` catches the
+tool-contract class: it loads the extension through Pi's own loader, invokes `macp_find`, and asserts the failure is
+about the hub rather than about the code. Control run with the old buggy shape reintroduced: 2 failures; restored: all pass.
