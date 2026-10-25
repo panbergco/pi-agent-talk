@@ -40,14 +40,15 @@
   },
   "files": [
     "src/",
-    "bin/",
     "center/dist/",
     "center/macp-center.service",
     "center/LICENSE",
     "center/NOTICE",
     "docs/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "bin/macp",
+    "bin/guard/tmux"
   ],
   "bin": {
     "macp": "bin/macp"
