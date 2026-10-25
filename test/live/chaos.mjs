@@ -106,7 +106,7 @@ const TASKS = {
     await sleep(25000); const t = `INT-${++n}`; const id = await send(`c${i}`, `Stop that. Reply to the human with macp_send: ${t}`, "interrupt");
     expect.push({ kind: "interrupt", t, from: `c${i}`, to: "human://", id }); },
 };
-const WEIGHTS = [["reply", 4], ["relay", 3], ["info", 2], ["busy", 2], ["interrupt", 1]];
+const WEIGHTS = [["reply", 4], ["relay", 3], ["info", 2], ["busy", 2], ["interrupt", Number(arg("interrupt-weight", 1))]];
 const pick = () => { let r = rnd(WEIGHTS.reduce((a, [, w]) => a + w, 0)); for (const [k, w] of WEIGHTS) { if ((r -= w) < 0) return k; } };
 
 // ── faults ──────────────────────────────────────────────────────────────────
