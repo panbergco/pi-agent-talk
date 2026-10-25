@@ -269,7 +269,9 @@ npm test                   # hub tests and the tmux guard test
 cd center && npm test      # 82 tests: protocol (21), rules (24), receipts, crash recovery and retention (23), the human in charge (14)
 ```
 
-[docs/LIVE-TESTS.md](docs/LIVE-TESTS.md) records the live runs with real Pi sessions. It also lists
+[docs/LIVE-TESTS.md](docs/LIVE-TESTS.md) records the live runs with real Pi sessions.
+`node test/live/chaos.mjs` runs N real Pi sessions under message load while killing, freezing and reloading
+sessions and the hub, then checks that nothing was lost, doubled or delivered as user input. It also lists
 the seven defects those runs found and fixed, and what was **not** tested: other machines, other
 harnesses, and a session stuck at an approval dialog (that case is covered only by a hub test).
 
