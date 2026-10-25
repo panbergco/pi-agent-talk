@@ -300,3 +300,20 @@ A **separate** herdr server (`herdr --session pat-test`), Pi sessions started in
 Two defects found and fixed on the way: a project name was matched with its `prj:` prefix (so one of two lanes
 in the same project looked unique), and a tie was judged by score rather than by *which words* matched — both
 now ask instead of guessing. `test/resolve.mjs` pins eleven phrases, including the two ties.
+
+## L19 · A handover the model composes, in the turn `/talk` starts
+
+Bob did a small piece of work (wrote a 3-line file), then was told only: `/talk hand over the file work to alice`.
+`/talk` in plain words injects a user message, which starts a turn (or steers a busy one) — that is where the
+brief is written. What arrived at alice (324 chars, steering, *asked by you*, read):
+
+```
+Handover — file work on /var/tmp/handover-test.txt (ufo).
+Done so far:
+- File created at /var/tmp/handover-test.txt via `printf 'a\nb\nc\n'`
+- Verified with `wc -l`: 3 lines (contents: a, b, c)
+Your turn: take over any further work on that file. No branch or session state involved — it's a plain scratch file in /var/tmp.
+```
+
+Not a forwarding of the human's three words: the model wrote done / your turn / where. Guidance now says a handover
+means "compose the brief from what you actually know", and that "prepare"/"draft" means show it and wait for the go-ahead.
