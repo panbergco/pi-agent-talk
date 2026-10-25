@@ -17,10 +17,19 @@ import { homedir } from "node:os";
 let key = process.env.MACP_TOKEN; try { key ??= readFileSync(process.env.MACP_TOKEN_FILE ?? `${homedir()}/.config/macp-center/token`, "utf8").trim(); } catch {}
 await c.connect(new StreamableHTTPClientTransport(new URL(process.env.MACP_URL || (() => { try { return readFileSync(process.env.MACP_URL_FILE ?? `${homedir()}/.config/macp-center/url`, "utf8").trim(); } catch { return ""; } })() || "http://127.0.0.1:7737/mcp"), key ? { requestInit: { headers: { Authorization: `Bearer ${key}` } } } : undefined));
 const call = async (name, a) => { const r = await c.callTool({ name, arguments: a }); const j = JSON.parse(r.content[0].text); if (r.isError) { console.error(j.error ?? JSON.stringify(j)); process.exitCode = 1; } return j; };
-await call("macp_register", { agent_id: userInfo().username, harness: "operator", ...(process.env.MACP_OPERATOR_TOKEN ? { operator_token: process.env.MACP_OPERATOR_TOKEN } : {}) });
+// As the human operator if the hub allows it (an operator key, or a hub without strict identity). A strict hub
+// refuses a bare process claiming to be the human — rightly, since an agent could run this too — and then only
+// the read-only directory is available here; sending and tracing as the human happen through /talk in a session.
+const reg = await c.callTool({ name: "macp_register", arguments: { agent_id: userInfo().username, harness: "operator", ...(process.env.MACP_OPERATOR_TOKEN ? { operator_token: process.env.MACP_OPERATOR_TOKEN } : {}) } });
+const asOperator = !reg.isError;
+if (!asOperator && cmd !== "roster") {
+  console.error("this hub requires the human to act through a live Pi session: use /talk there (or set MACP_OPERATOR_TOKEN)");
+  process.exit(1);
+}
 if (cmd === "roster") {
-  const r = await call("macp_roster", { project: args[0]?.startsWith("prj:") || !args[0] ? args[0] : `prj:${args[0]}`, include_offline: true });
-  for (const a of r.agents ?? []) console.log(`${a.live ? "live   " : "offline"}  ${(a.role ?? "-").padEnd(14)} ${(a.state ?? "-").padEnd(5)} ${a.location ?? a.address}`);
+  const proj = args[0] && !args[0].startsWith("prj:") ? `prj:${args[0]}` : args[0];
+  const r = asOperator ? await call("macp_roster", { project: proj, include_offline: true }) : await call("macp_roster", { all: true });
+  for (const a of (r.agents ?? []).filter((x) => !proj || x.project === proj)) console.log(`${a.live ? "live   " : "offline"}  ${(a.role ?? "-").padEnd(14)} ${(a.state ?? "-").padEnd(5)} ${a.location ?? a.address}`);
 } else if (cmd === "send") {
   const pr = flags.includes("--interrupt") ? "interrupt" : flags.includes("--info") ? "info" : flags.includes("--advisory") ? "advisory" : "steering";
   const r = await call("macp_send", { to: args[0], body: args.slice(1).join(" "), priority: pr });
