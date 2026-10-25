@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-talk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent-to-agent messaging for Pi over MACP 2.0: messages enter as attributed custom messages at the next inference boundary \u2014 never through the prompt box, never in the human's input history.",
   "type": "module",
   "license": "Apache-2.0",
