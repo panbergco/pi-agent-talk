@@ -254,3 +254,17 @@ An attacker process that has everything on disk and no secret (what an agent's s
 
 Normal use unchanged: `/talk` in plain words round-trip (answer labelled), and `/talk allow bob 1`
 (the human acting through alice's in-memory secret).
+
+## L16 · Chaos: five rounds, real sessions, real faults (`test/live/chaos.mjs`)
+
+Five Pi sessions on Qwen3.8-27B (one shared model slot), a driver sending replies, agent-to-agent relays,
+non-waking notes, busy-session steering and interrupts, and faults injected every few minutes. Invariants are
+read from the hub's database and every session's conversation file.
+
+| Round | Minutes | Faults | Tasks met | Found |
+|---|---|---|---|---|
+| 1 | 45 | 11 (kill -9 sessions ×4, freezes ×2, hub stops, reload) | 114/116 | the 2 misses were agent→agent steering **downgraded to advisory** (no grant in the test's rules), which correctly never woke an idle receiver. Test rules fixed |
+| 2 | 25 | 6 (kill -9 hub, hub stops ×3, reloads ×2) | 65/65 | **1 message placed twice**: an interrupt's held batch and a mail check both placed it inside a 150 ms window. **Fixed** at the one placing function |
+| 3 | 30 | 8, interrupt-heavy | 64/68 | 0 duplicates across 21 interrupts (fix holds). The 4 misses were one agent's model declining to message the human on another agent's say-so (model judgement, not delivery). Test measure fixed |
+| 4 | 20 | 4 | 50/52 | **a message lost**: queued for a busy session, then the run was cancelled by an interrupt; Pi drops its steering queue on cancel. Reproduced (2 messages, an interrupt), **fixed** (anything queued but never seen by a model call is placed again after the run), verified 3/3 with a control on the old code (not read) |
+| 5 | 25 | 7 (kill -9 hub ×2, hub stop, freezes ×2, kill -9 session, reload) | **60/60** | none. 0 duplicates, 0 user-role, 0 identity conflicts, 0 placed-but-unread |
