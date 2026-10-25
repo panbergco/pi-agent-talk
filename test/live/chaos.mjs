@@ -32,7 +32,9 @@ const tmux = (...a) => spawnSync("tmux", ["-L", "pi-harness", ...a], { encoding:
 
 // ── setup ──────────────────────────────────────────────────────────────────
 rmSync(DIR, { recursive: true, force: true }); mkdirSync(DIR, { recursive: true });
-writeFileSync(POLICY, JSON.stringify({ projects: { chaos: { agentSend: "always" } }, limits: { perMinute: 60, pairPer10Min: 200 } }));
+// Agents may send on their own here AND steer each other (an allow rule is a grant): without it the hub downgrades
+// agent→agent steering to advisory, which never wakes an idle receiver (round 1 measured exactly that, 2 of 23 relays).
+writeFileSync(POLICY, JSON.stringify({ projects: { chaos: { agentSend: "always", allow: [{ from: "*", to: "*", max: "steering" }] } }, limits: { perMinute: 60, pairPer10Min: 200 } }));
 const ENV = {
   MACP_URL: URL_, MACP_DB: DB, MACP_POLICY: POLICY, MACP_PROJECT: "chaos", MACP_STRICT_IDENTITY: "1",
   MACP_OPERATOR_TOKEN: OPKEY, MACP_STUCK_SECONDS: "90", MACP_TMUX_GUARD: "0", MACP_ROLES: join(DIR, "no-roles.json"),

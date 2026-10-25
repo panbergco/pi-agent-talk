@@ -404,6 +404,9 @@ export default function (pi: ExtensionAPI) {
 
   /** Append one coalesced block via Pi's own queue, then record + ack. */
   function place(envs: Envelope[]): void {
+    // THE ONE CHOKE POINT: never place an id twice, whichever path calls this. Measured 2026-10-25 (chaos round 2):
+    // an interrupt's held batch was placed 150 ms after the run ended, and a mail check in that window placed it too.
+    envs = envs.filter((e) => !delivered.has(e.id));
     if (envs.length === 0 || !address) return;
     const wakes = envs.some((e) => RANK[e.priority] <= RANK.steering);
     const midTask = busy();
