@@ -203,7 +203,7 @@ marks that run as the human's, whatever the load order.
 
 Run one hub where every machine can reach it, with an access key: `--host 0.0.0.0` plus
 `--token-file`. On every other machine, put the hub's address in `~/.config/macp-center/url` (one line, e.g.
-`http://192.168.1.10:7737/mcp`) and the key in `~/.config/macp-center/token` (mode 600). `MACP_URL` and
+`http://<hub-host>:7737/mcp`) and the key in `~/.config/macp-center/token` (mode 600). `MACP_URL` and
 `MACP_TOKEN` override them. Without the key a connection is refused.
 
 ### Agents send only when their human asks

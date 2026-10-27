@@ -56,7 +56,7 @@ function launch(i, resumeFile) {
   tmux("kill-session", "-t", name);
   // --no-extensions keeps the test hermetic, so the model's provider extension must be named explicitly
   // (the ollama-cloud provider comes from an extension, not from Pi's core).
-  const providerExt = MODEL.startsWith("ollama-cloud/") ? ` -e ${join(homedir(), "Code", "pi-ollama-cloud")}` : "";
+  const providerExt = MODEL.startsWith("ollama-cloud/") ? ` -e ${process.env.PI_PROVIDER_EXTENSION ?? ""}` : "";
   tmux("new-session", "-d", "-s", name, "-x", "150", "-y", "45", "-c", dir, `env ${env} pi --no-extensions --no-skills -e ${ROOT}${providerExt} --model ${MODEL} ${sess}`);
   sessions[i] = { i, name, dir, role: `c${i}` };
 }

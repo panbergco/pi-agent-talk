@@ -9,7 +9,7 @@ const agents = [
   { address: "agent://pi/a2", role: "builder", project: "prj:shop", location: "desk · tmux main:3 'shop-builder' · ~/Code/shop" },
   { address: "agent://pi/a3", role: "vanness", project: "prj:review-project", location: "desk · herdr review:build (w4:p2) · ~/Code/review-project" },
   { address: "agent://pi/a4", role: "designer", project: "prj:review-project", location: "server · herdr main (w1:p3) · ~/Code/notes" },
-  { address: "agent://pi/a5", role: "cad", project: "prj:desk-workspace", location: "desk · herdr freecad (w2:p1) · ~/Code/sim-rig" },
+  { address: "agent://pi/a5", role: "cad", project: "prj:desk-workspace", location: "desk · herdr freecad (w2:p1) · ~/Code/cad-project" },
 ];
 
 let pass = 0, fail = 0;
