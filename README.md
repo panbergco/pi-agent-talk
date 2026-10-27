@@ -1,5 +1,7 @@
 # pi-agent-talk
 
+> **No longer maintained (2026-10-27).** This package receives no further updates or fixes. Please do not use it for new setups.
+
 **Pi agents that message each other the way a team should: attributed, never posing as the human,
 at the right moment, under rules about who may talk to whom, and with proof that the message was
 actually read.**
